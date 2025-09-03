@@ -1,65 +1,81 @@
 package com.ramez.notesapp.ui.Screens
 
-import androidx.compose.material.icons.filled.Add
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.*
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import com.ramez.notesapp.data.NoteEntity
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable
+@Composable              //All comments for me 3shan arag3
 fun NoteScreen(
-    onBack: () -> Unit = {}
+    navController: NavController,
+    noteId: Int? = null, // hena hnst2bl el note id
+    userid:Int
 ) {
-    var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val db = remember { AppDataBase.getDataBase(context) }
+    val noteDao = remember { db.noteDao() }
+    val scope = rememberCoroutineScope()
+
+    var title by rememberSaveable { mutableStateOf("") }
+    var content by rememberSaveable { mutableStateOf("") }
+    var showDialog by remember { mutableStateOf(false) }
+
+    // 3shan ageeb note 2deema mn el database
+    LaunchedEffect(noteId) {
+        if (noteId != null) {
+            val oldNote = noteDao.getNoteById(noteId)
+            title = oldNote.title.toString()
+            content = oldNote.body.toString()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { onBack() }) {
+                    IconButton(onClick = { navController.navigate("Home") }) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = Color.Black
                         )
                     }
                 },
                 actions = {
-                    // زرار الصورة
                     IconButton(
-                        onClick = { },
+                        onClick = { showDialog = true },
                         modifier = Modifier
-                            .background(Color(0xFF2C2C2C), RoundedCornerShape(8.dp))
-                    )
-                    {
+                            .background(
+                                Color(0xFF2C2C2C),
+                                RoundedCornerShape(8.dp)
+                            )
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Image",
+                            imageVector = Icons.Default.Done,
+                            contentDescription = "Done",
                             tint = Color.White
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                   // containerColor = Color(0xFF1C1C1C)
-                )
             )
-        },
-        // containerColor = Color(0xFF1C1C1C)
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -71,38 +87,89 @@ fun NoteScreen(
             TextField(
                 value = title,
                 onValueChange = { title = it },
-                placeholder = { Text("Title",
+                placeholder = {
+                    Text(
+                        "Title",
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                textStyle = TextStyle(
                     fontSize = 28.sp,
-                    fontWeight = FontWeight.SemiBold) },
-                textStyle = TextStyle(fontSize = 28.sp,
-                    fontWeight = FontWeight.SemiBold, color = Color.Black),
-
-//                colors = TextFieldDefaults.TextFieldDefaults.colors(
-//                    containerColor = Color.Transparent,
-//                    cursorColor = Color.White,
-//                    focusedIndicatorColor = Color.Transparent,
-//                    unfocusedIndicatorColor = Color.Transparent
-//                ),
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.Black
+                ),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            // المحتوى
+            // el content
             TextField(
                 value = content,
                 onValueChange = { content = it },
-                placeholder = { Text("Type something...",
-                    color = Color.Gray) },
+                placeholder = {
+                    Text(
+                        "Type something...",
+                        color = Color.Gray
+                    )
+                },
                 textStyle = TextStyle(fontSize = 18.sp, color = Color.Black),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent
+                ),
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
-//                colors = TextFieldDefaults.TextFieldDefaults.colors(
-//                    containerColor = Color.Transparent,          // الخلفية شفافة (هتظهر زي الخلفية اللي وراه)
-//                    focusedIndicatorColor = Color.Transparent,   // خط البوردر (فوكَس) شيلته
-//                    unfocusedIndicatorColor = Color.Transparent, // خط البوردر (عادي) شيلته
-//                    disabledIndicatorColor = Color.Transparent
-//                ),
-                modifier = Modifier
-                    .fillMaxSize()
+
+        // Da el AlerDialog (elly by2oly confirm w discard)
+        if (showDialog) {
+            AlertDialog(
+                onDismissRequest = { showDialog = false },
+                title = { Text("Save Note") },
+                text = { Text("Do you want to confirm or discard this note?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        scope.launch {
+                            if (noteId != null) {
+                                // Update
+                                val updatedNote = NoteEntity(
+                                    id = noteId,
+                                    title = title,
+                                    body = content,
+                                    userId = userid
+                                )
+                                noteDao.updateNote(updatedNote)
+                            } else {
+                                // Add
+                                val newNote = NoteEntity(
+                                    title = title,
+                                    body = content,
+                                    userId = userid
+                                )
+                                noteDao.addNote(newNote)
+                            }
+                        }
+                        navController.navigate("Home/${userid}") {
+                            popUpTo("Home/${userid}") { inclusive = true }
+                        }
+                        showDialog = false
+                    }) {
+                        Text("Confirm")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        showDialog = false
+                    }) {
+                        Text("Discard")
+                    }
+                }
             )
         }
     }

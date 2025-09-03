@@ -20,8 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun MakeTextField(title: String) {
-    var text by rememberSaveable { mutableStateOf("") }
+fun MakeTextField(title: String, text : String ,
+                  onValueChange: (String)-> Unit) {
     Box(
         modifier = Modifier
             .shadow(
@@ -36,11 +36,11 @@ fun MakeTextField(title: String) {
             TextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = text,
-                onValueChange = { text = it },
+                onValueChange = onValueChange,
                 placeholder = { Text(text = title) },
                 label = { Text(text = title) }
             )
+            }
         }
-    }
 }
 
